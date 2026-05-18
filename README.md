@@ -20,7 +20,7 @@ Implementación del **Algoritmo de Elección Bully** (Garcia-Molina, 1982) usand
 ## Instalación
 
 ```bash
-git clone https://github.com/TU_USUARIO/bully-simulator.git
+git clone https://github.com/JorgeLuis1907/bully-simulator.git
 cd bully-simulator
 ```
 
