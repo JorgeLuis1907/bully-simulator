@@ -1,0 +1,47 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: bully-node-${bully.node-id}
+
+# Configuración del algoritmo Bully
+# Los valores son sobreescritos por variables de entorno en docker-compose
+bully:
+  # ID de este nodo (inyectado via NODE_ID en Docker)
+  node-id: ${NODE_ID:1}
+
+  # Timeouts del algoritmo (ms)
+  # Deben ser MAYORES que la latencia máxima de Toxiproxy para evitar falsos positivos
+  election-timeout-ms: ${ELECTION_TIMEOUT_MS:4000}
+  heartbeat-interval-ms: ${HEARTBEAT_INTERVAL_MS:2000}
+  heartbeat-timeout-ms: ${HEARTBEAT_TIMEOUT_MS:4000}
+  coordinator-check-delay-ms: 1000
+  max-missed-heartbeats: 2
+
+  # URLs de los peers (siempre apuntan a Toxiproxy, no directamente al nodo)
+  # Formato: ID_NODO: http://proxy-nodoN:PUERTO
+  peers:
+    1: ${PEER_1_URL:http://proxy-node1:18881}
+    2: ${PEER_2_URL:http://proxy-node2:18882}
+    3: ${PEER_3_URL:http://proxy-node3:18883}
+    4: ${PEER_4_URL:http://proxy-node4:18884}
+    5: ${PEER_5_URL:http://proxy-node5:18885}
+
+# Logging detallado para observar el algoritmo en acción
+logging:
+  level:
+    com.bully: INFO
+    org.springframework.web.client: WARN
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{20} - %msg%n"
+
+# Actuator para health checks de Docker
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

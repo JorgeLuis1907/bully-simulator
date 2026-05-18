@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bully Election Monitor</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+:root{
+  --bg:#0a0c10;--s:#111318;--b:#1e2130;--t:#c9d1e0;--m:#4a5270;
+  --alive:#22c55e;--elec:#f59e0b;--wait:#f97316;--coord:#eab308;--down:#ef4444;--acc:#6366f1;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:var(--t);padding:16px;}
+
+header{text-align:center;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--b);}
+header h1{font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;
+  background:linear-gradient(135deg,#6366f1,#a855f7,#ec4899);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+header p{color:var(--m);font-size:0.7rem;margin-top:3px;}
+.hbadge{display:inline-block;margin-top:5px;font-size:0.63rem;color:var(--acc);
+  border:1px solid var(--acc);padding:2px 10px;border-radius:99px;}
+
+.legend{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:12px;}
+.li{display:flex;align-items:center;gap:5px;font-size:0.65rem;color:var(--m);}
+.ld{width:8px;height:8px;border-radius:50%;}
+
+.stats-bar{display:flex;flex-wrap:wrap;gap:14px;background:var(--s);border:1px solid var(--b);
+  border-radius:10px;padding:10px 16px;margin-bottom:12px;align-items:center;}
+.stat{text-align:center;}
+.stat-val{font-family:'Syne',sans-serif;font-size:1.25rem;font-weight:800;color:var(--acc);}
+.stat-lbl{font-size:0.54rem;color:var(--m);text-transform:uppercase;}
+
+/* GRID NODOS */
+.nodes-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px;}
+.node-card{border-radius:10px;padding:13px;position:relative;overflow:hidden;
+  background:var(--s);border:2px solid var(--b);transition:all 0.4s;}
+.node-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  border-radius:8px 8px 0 0;transition:background 0.4s;}
+
+/* Estados — borde + barra superior */
+.node-card[data-state="ALIVE"]            { border-color:rgba(34,197,94,.4); }
+.node-card[data-state="ALIVE"]::before    { background:var(--alive); }
+.node-card[data-state="ELECTION_STARTED"] { border-color:rgba(245,158,11,.5); }
+.node-card[data-state="ELECTION_STARTED"]::before { background:var(--elec); }
+.node-card[data-state="WAITING_FOR_OK"]   { border-color:rgba(249,115,22,.5); }
+.node-card[data-state="WAITING_FOR_OK"]::before   { background:var(--wait); }
+.node-card[data-state="COORDINATOR"]      { border-color:rgba(234,179,8,.8);
+  box-shadow:0 0 32px rgba(234,179,8,.25);animation:pgold 2s infinite; }
+.node-card[data-state="COORDINATOR"]::before { background:var(--coord); }
+.node-card[data-state="DOWN"]             { border-color:rgba(239,68,68,.3);opacity:0.42; }
+.node-card[data-state="DOWN"]::before     { background:var(--down); }
+
+@keyframes pgold{0%,100%{box-shadow:0 0 20px rgba(234,179,8,.12);}50%{box-shadow:0 0 44px rgba(234,179,8,.4);}}
+
+.node-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;}
+.node-title{font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;}
+
+/* Badge — color controlado por data-s */
+.sbadge{font-size:0.52rem;font-weight:700;padding:2px 7px;border-radius:5px;
+  text-transform:uppercase;white-space:nowrap;letter-spacing:.04em;
+  background:rgba(74,82,112,.2);color:var(--m);transition:background 0.3s,color 0.3s;}
+.sbadge[data-s="ALIVE"]            {background:rgba(34,197,94,.15); color:var(--alive);}
+.sbadge[data-s="ELECTION_STARTED"] {background:rgba(245,158,11,.15);color:var(--elec);animation:blink .8s infinite;}
+.sbadge[data-s="WAITING_FOR_OK"]   {background:rgba(249,115,22,.15);color:var(--wait);animation:blink .8s infinite;}
+.sbadge[data-s="COORDINATOR"]      {background:rgba(234,179,8,.22); color:var(--coord);}
+.sbadge[data-s="DOWN"]             {background:rgba(239,68,68,.15); color:var(--down);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:7px;}
+.metric{background:rgba(255,255,255,.03);border:1px solid var(--b);border-radius:6px;padding:5px 8px;}
+.mlbl{font-size:0.52rem;color:var(--m);text-transform:uppercase;}
+.mval{font-size:0.8rem;font-weight:700;margin-top:2px;}
+.ndesc{margin-top:7px;font-size:0.58rem;color:var(--m);line-height:1.5;min-height:20px;}
+
+/* PANELES INFERIORES */
+.bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.panel{background:var(--s);border:1px solid var(--b);border-radius:10px;padding:14px;}
+.panel h2{font-family:'Syne',sans-serif;font-size:0.68rem;color:var(--m);
+  text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;
+  border-bottom:1px solid var(--b);padding-bottom:6px;}
+
+/* Log de cambios de estado */
+#state-log{list-style:none;max-height:260px;overflow-y:auto;}
+#state-log li{display:flex;gap:8px;align-items:flex-start;
+  padding:6px 0;border-bottom:1px solid rgba(30,33,48,.8);}
+#state-log li:first-child{padding-top:2px;}
+.sl-time{color:var(--acc);flex-shrink:0;font-size:0.58rem;padding-top:2px;font-variant-numeric:tabular-nums;}
+.sl-body{display:flex;flex-direction:column;gap:2px;}
+.sl-row{display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
+.sl-node{font-weight:700;font-size:0.7rem;color:var(--t);}
+.sl-chip{font-size:0.55rem;font-weight:700;padding:1px 5px;border-radius:4px;
+  text-transform:uppercase;white-space:nowrap;}
+.sl-arrow{color:var(--m);}
+.sl-desc{font-size:0.58rem;color:var(--m);}
+/* chips de estado */
+.cALIVE{background:rgba(34,197,94,.15);color:var(--alive);}
+.cELECTION_STARTED{background:rgba(245,158,11,.15);color:var(--elec);}
+.cWAITING_FOR_OK{background:rgba(249,115,22,.15);color:var(--wait);}
+.cCOORDINATOR{background:rgba(234,179,8,.2);color:var(--coord);}
+.cDOWN{background:rgba(239,68,68,.15);color:var(--down);}
+.cUNKNOWN{background:rgba(74,82,112,.2);color:var(--m);}
+
+/* Log de actividad */
+#algo-log{max-height:260px;overflow-y:auto;font-size:0.63rem;line-height:1.85;}
+.al{display:flex;gap:8px;padding:2px 0;border-bottom:1px solid rgba(30,33,48,.5);}
+.al-t{color:var(--m);flex-shrink:0;font-size:0.58rem;font-variant-numeric:tabular-nums;}
+.ac{color:var(--coord);font-weight:700;}
+.ae{color:var(--elec);font-weight:700;}
+.aw{color:var(--wait);}
+.ao{color:var(--alive);}
+.ad{color:var(--down);}
+.am{color:var(--m);}
+
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:var(--b);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ Bully Election Monitor</h1>
+  <p>Simulador Algoritmo de Elección Bully · Sistemas Distribuidos · Toxiproxy</p>
+  <span class="hbadge" id="rbadge">Conectando...</span>
+</header>
+
+<div class="legend">
+  <div class="li"><div class="ld" style="background:var(--alive)"></div>ALIVE</div>
+  <div class="li"><div class="ld" style="background:var(--elec)"></div>ELECTION_STARTED</div>
+  <div class="li"><div class="ld" style="background:var(--wait)"></div>WAITING_FOR_OK</div>
+  <div class="li"><div class="ld" style="background:var(--coord)"></div>COORDINATOR</div>
+  <div class="li"><div class="ld" style="background:var(--down)"></div>DOWN</div>
+</div>
+
+<div class="stats-bar">
+  <div class="stat"><div class="stat-val" id="sc">—</div><div class="stat-lbl">👑 Coordinador</div></div>
+  <div class="stat"><div class="stat-val" id="sa">—</div><div class="stat-lbl">✅ Vivos</div></div>
+  <div class="stat"><div class="stat-val" id="se">—</div><div class="stat-lbl">🗳️ Elecciones</div></div>
+  <div class="stat"><div class="stat-val" id="su">0</div><div class="stat-lbl">🔄 Updates</div></div>
+  <div class="stat"><div class="stat-val" id="sev">0</div><div class="stat-lbl">📋 Eventos</div></div>
+</div>
+
+<div class="nodes-grid" id="grid"></div>
+
+<div class="bottom-grid">
+  <div class="panel">
+    <h2>🔄 Cambios de Estado del Algoritmo</h2>
+    <ul id="state-log">
+      <li>
+        <span class="sl-time">--:--:--</span>
+        <div class="sl-body">
+          <div class="sl-row"><span class="sl-node">Sistema</span></div>
+          <div class="sl-desc">Esperando actividad del clúster...</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+  <div class="panel">
+    <h2>📡 Actividad en Tiempo Real</h2>
+    <div id="algo-log">
+      <div class="al"><span class="al-t">--:--:--</span><span class="am">Iniciando monitoreo directo a puertos 8081-8085...</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Acceso DIRECTO a los nodos por puerto (sin proxy Nginx)
+// Los puertos 8081-8085 ya están expuestos en el host por docker-compose
+const NODE_URLS = {
+  1: 'http://localhost:8081',
+  2: 'http://localhost:8082',
+  3: 'http://localhost:8083',
+  4: 'http://localhost:8084',
+  5: 'http://localhost:8085',
+};
+
+const STATE_LABEL = {
+  ALIVE:'✅ ALIVE', ELECTION_STARTED:'🗳️ ELECTION',
+  WAITING_FOR_OK:'⏳ WAITING OK', COORDINATOR:'👑 COORDINATOR', DOWN:'💀 DOWN'
+};
+
+const TRANS_DESC = {
+  'ALIVE→ELECTION_STARTED':         'Coordinador no responde — inicia elección',
+  'ALIVE→DOWN':                     'Nodo caído (Toxiproxy timeout)',
+  'ALIVE→COORDINATOR':              'Promovido directamente a coordinador',
+  'ELECTION_STARTED→WAITING_FOR_OK':'ELECTION enviado — esperando respuesta OK',
+  'ELECTION_STARTED→COORDINATOR':   '¡Sin respuesta superior — ganó la elección!',
+  'ELECTION_STARTED→ALIVE':         'Recibió COORDINATOR, acepta nuevo líder',
+  'WAITING_FOR_OK→ALIVE':           'Recibió anuncio COORDINATOR',
+  'WAITING_FOR_OK→COORDINATOR':     'Timeout sin OK — se proclama COORDINADOR',
+  'WAITING_FOR_OK→ELECTION_STARTED':'Reinicia elección (falla en cascada)',
+  'COORDINATOR→ELECTION_STARTED':   'Coordinador inicia nueva elección',
+  'COORDINATOR→ALIVE':              'Cedió liderazgo a nodo superior',
+  'COORDINATOR→DOWN':               'Coordinador caído (Toxiproxy)',
+  'DOWN→ALIVE':                     'Nodo recuperado — buscando coordinador',
+  'DOWN→ELECTION_STARTED':          'Nodo recuperado e inicia elección',
+};
+
+const prevState = {};
+const stEvents  = [];
+const algoMsgs  = [];
+let updates = 0, evCount = 0;
+
+function tnow() {
+  return new Date().toLocaleTimeString('es-PE', {hour12:false});
+}
+
+function chip(state) {
+  const s = state || 'UNKNOWN';
+  return `<span class="sl-chip c${s}">${s.replace('_',' ')}</span>`;
+}
+
+function onStateChange(nid, prev, next) {
+  const key  = `${prev}→${next}`;
+  const desc = TRANS_DESC[key] || `Transición detectada`;
+  stEvents.unshift({ t:tnow(), nid, prev, next, desc });
+  if (stEvents.length > 100) stEvents.pop();
+  evCount++;
+  document.getElementById('sev').textContent = evCount;
+
+  // Mensaje de actividad
+  let cls = 'am', msg = '';
+  if      (next==='COORDINATOR')           { cls='ac'; msg=`👑 Nodo ${nid} es el NUEVO COORDINADOR`; }
+  else if (next==='ELECTION_STARTED')      { cls='ae'; msg=`🗳️  Nodo ${nid} inició ELECCIÓN`; }
+  else if (next==='WAITING_FOR_OK')        { cls='aw'; msg=`⏳ Nodo ${nid} esperando OK de nodos superiores`; }
+  else if (next==='DOWN')                  { cls='ad'; msg=`💀 Nodo ${nid} CAÍDO — otros nodos detectarán la falla`; }
+  else if (next==='ALIVE' && prev==='DOWN'){ cls='ao'; msg=`♻️  Nodo ${nid} recuperado — iniciando rejoin`; }
+  else if (next==='ALIVE')                 { cls='ao'; msg=`✅ Nodo ${nid} volvió a ALIVE`; }
+  addAlgoMsg(msg, cls);
+  renderStateLog();
+}
+
+function addAlgoMsg(msg, cls='am') {
+  algoMsgs.unshift({ t:tnow(), msg, cls });
+  if (algoMsgs.length > 120) algoMsgs.pop();
+  renderAlgoLog();
+}
+
+function renderStateLog() {
+  if (stEvents.length === 0) return;
+  document.getElementById('state-log').innerHTML = stEvents.map(e => `
+    <li>
+      <span class="sl-time">${e.t}</span>
+      <div class="sl-body">
+        <div class="sl-row">
+          <span class="sl-node">Nodo ${e.nid}</span>
+          ${chip(e.prev)}
+          <span class="sl-arrow">→</span>
+          ${chip(e.next)}
+        </div>
+        <div class="sl-desc">${e.desc}</div>
+      </div>
+    </li>`).join('');
+}
+
+function renderAlgoLog() {
+  document.getElementById('algo-log').innerHTML = algoMsgs.map(m =>
+    `<div class="al"><span class="al-t">${m.t}</span><span class="${m.cls}">${m.msg}</span></div>`
+  ).join('');
+}
+
+function buildCard(id) {
+  const c = document.createElement('div');
+  c.className = 'node-card';
+  c.id = `card-${id}`;
+  c.innerHTML = `
+    <div class="node-header">
+      <div class="node-title" id="ntitle-${id}">Nodo ${id}</div>
+      <span class="sbadge" id="badge-${id}" data-s="">—</span>
+    </div>
+    <div class="metrics">
+      <div class="metric"><div class="mlbl">Coordinador</div><div class="mval" id="mc-${id}">—</div></div>
+      <div class="metric"><div class="mlbl">Elecciones</div><div class="mval" id="me-${id}">—</div></div>
+      <div class="metric"><div class="mlbl">Veces Líder</div><div class="mval" id="ml-${id}">—</div></div>
+      <div class="metric"><div class="mlbl">Últ. Cambio</div><div class="mval" id="mch-${id}">—</div></div>
+    </div>
+    <div class="ndesc" id="md-${id}">Conectando...</div>`;
+  return c;
+}
+
+function updateCard(id, info) {
+  const state = info ? info.state : 'DOWN';
+  const card  = document.getElementById(`card-${id}`);
+  const prev  = prevState[id];
+
+  if (prev !== undefined && prev !== state) onStateChange(id, prev, state);
+  prevState[id] = state;
+
+  // Aplicar estado
+  card.dataset.state = state;
+
+  // Badge
+  const badge = document.getElementById(`badge-${id}`);
+  badge.textContent = STATE_LABEL[state] || state;
+  badge.dataset.s   = state;
+
+  // Título — corona SOLO al coordinador
+  document.getElementById(`ntitle-${id}`).textContent =
+    state === 'COORDINATOR' ? `Nodo ${id} 👑` : `Nodo ${id}`;
+
+  // Métricas
+  if (info) {
+    document.getElementById(`mc-${id}`).textContent =
+      info.currentCoordinatorId > 0 ? `Nodo ${info.currentCoordinatorId}` : '—';
+    document.getElementById(`me-${id}`).textContent  = info.electionsStarted ?? '—';
+    document.getElementById(`ml-${id}`).textContent  = info.timesElectedCoordinator ?? '—';
+    const secs = info.lastStateChangeMs
+      ? Math.round((Date.now() - info.lastStateChangeMs) / 1000) + 's' : '—';
+    document.getElementById(`mch-${id}`).textContent = secs;
+    document.getElementById(`md-${id}`).textContent  = (info.statusDescription||'').slice(0,65);
+  } else {
+    ['mc','me','ml','mch'].forEach(f => document.getElementById(`${f}-${id}`).textContent='—');
+    document.getElementById(`md-${id}`).textContent = 'Sin respuesta (iniciando o DOWN)';
+  }
+}
+
+async function fetchNode(id) {
+  try {
+    const r = await fetch(`${NODE_URLS[id]}/bully/status`, {signal: AbortSignal.timeout(2500)});
+    if (!r.ok) throw new Error();
+    return await r.json();
+  } catch { return null; }
+}
+
+async function refresh() {
+  const results = await Promise.all([1,2,3,4,5].map(fetchNode));
+  results.forEach((info, i) => updateCard(i+1, info));
+
+  const alive = results.filter(r => r && r.state !== 'DOWN').length;
+  const coord = results.find(r => r && r.state === 'COORDINATOR');
+  const telec = results.reduce((s,r) => s + (r?.electionsStarted ?? 0), 0);
+
+  document.getElementById('sc').textContent  = coord ? `Nodo ${coord.nodeId}` : '—';
+  document.getElementById('sa').textContent  = `${alive}/5`;
+  document.getElementById('se').textContent  = telec;
+  document.getElementById('su').textContent  = ++updates;
+  document.getElementById('rbadge').textContent = `Último update: ${tnow()} · cada 2s`;
+}
+
+// Arrancar
+const grid = document.getElementById('grid');
+[1,2,3,4,5].forEach(id => grid.appendChild(buildCard(id)));
+addAlgoMsg('Dashboard iniciado — acceso directo a puertos 8081-8085', 'am');
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>

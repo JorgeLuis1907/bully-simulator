@@ -1,0 +1,186 @@
+networks:
+  bully-network:
+    driver: bridge
+
+volumes:
+  logs-node-1:
+  logs-node-2:
+  logs-node-3:
+  logs-node-4:
+  logs-node-5:
+
+services:
+
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.9.0
+    container_name: toxiproxy
+    hostname: toxiproxy
+    networks:
+      - bully-network
+    ports:
+      - "8474:8474"
+      - "18881:18881"
+      - "18882:18882"
+      - "18883:18883"
+      - "18884:18884"
+      - "18885:18885"
+
+  toxiproxy-init:
+    image: curlimages/curl:8.7.1
+    container_name: toxiproxy-init
+    networks:
+      - bully-network
+    depends_on:
+      - toxiproxy
+    volumes:
+      - ./toxiproxy-init/init-proxies.sh:/init-proxies.sh:ro
+    entrypoint: ["/bin/sh", "/init-proxies.sh"]
+    restart: "no"
+
+  node-1:
+    build:
+      context: ./node-service
+      dockerfile: Dockerfile
+    container_name: node-1
+    hostname: node-1
+    networks:
+      - bully-network
+    ports:
+      - "8081:8080"
+    environment:
+      NODE_ID: "1"
+      PEER_1_URL: "http://toxiproxy:18881"
+      PEER_2_URL: "http://toxiproxy:18882"
+      PEER_3_URL: "http://toxiproxy:18883"
+      PEER_4_URL: "http://toxiproxy:18884"
+      PEER_5_URL: "http://toxiproxy:18885"
+      ELECTION_TIMEOUT_MS: "6000"
+      HEARTBEAT_INTERVAL_MS: "5000"
+      HEARTBEAT_TIMEOUT_MS: "10000"
+    volumes:
+      - logs-node-1:/app/logs
+    depends_on:
+      - toxiproxy-init
+    restart: unless-stopped
+
+  node-2:
+    build:
+      context: ./node-service
+      dockerfile: Dockerfile
+    container_name: node-2
+    hostname: node-2
+    networks:
+      - bully-network
+    ports:
+      - "8082:8080"
+    environment:
+      NODE_ID: "2"
+      PEER_1_URL: "http://toxiproxy:18881"
+      PEER_2_URL: "http://toxiproxy:18882"
+      PEER_3_URL: "http://toxiproxy:18883"
+      PEER_4_URL: "http://toxiproxy:18884"
+      PEER_5_URL: "http://toxiproxy:18885"
+      ELECTION_TIMEOUT_MS: "6000"
+      HEARTBEAT_INTERVAL_MS: "5000"
+      HEARTBEAT_TIMEOUT_MS: "10000"
+    volumes:
+      - logs-node-2:/app/logs
+    depends_on:
+      - toxiproxy-init
+    restart: unless-stopped
+
+  node-3:
+    build:
+      context: ./node-service
+      dockerfile: Dockerfile
+    container_name: node-3
+    hostname: node-3
+    networks:
+      - bully-network
+    ports:
+      - "8083:8080"
+    environment:
+      NODE_ID: "3"
+      PEER_1_URL: "http://toxiproxy:18881"
+      PEER_2_URL: "http://toxiproxy:18882"
+      PEER_3_URL: "http://toxiproxy:18883"
+      PEER_4_URL: "http://toxiproxy:18884"
+      PEER_5_URL: "http://toxiproxy:18885"
+      ELECTION_TIMEOUT_MS: "6000"
+      HEARTBEAT_INTERVAL_MS: "5000"
+      HEARTBEAT_TIMEOUT_MS: "10000"
+    volumes:
+      - logs-node-3:/app/logs
+    depends_on:
+      - toxiproxy-init
+    restart: unless-stopped
+
+  node-4:
+    build:
+      context: ./node-service
+      dockerfile: Dockerfile
+    container_name: node-4
+    hostname: node-4
+    networks:
+      - bully-network
+    ports:
+      - "8084:8080"
+    environment:
+      NODE_ID: "4"
+      PEER_1_URL: "http://toxiproxy:18881"
+      PEER_2_URL: "http://toxiproxy:18882"
+      PEER_3_URL: "http://toxiproxy:18883"
+      PEER_4_URL: "http://toxiproxy:18884"
+      PEER_5_URL: "http://toxiproxy:18885"
+      ELECTION_TIMEOUT_MS: "6000"
+      HEARTBEAT_INTERVAL_MS: "5000"
+      HEARTBEAT_TIMEOUT_MS: "10000"
+    volumes:
+      - logs-node-4:/app/logs
+    depends_on:
+      - toxiproxy-init
+    restart: unless-stopped
+
+  node-5:
+    build:
+      context: ./node-service
+      dockerfile: Dockerfile
+    container_name: node-5
+    hostname: node-5
+    networks:
+      - bully-network
+    ports:
+      - "8085:8080"
+    environment:
+      NODE_ID: "5"
+      PEER_1_URL: "http://toxiproxy:18881"
+      PEER_2_URL: "http://toxiproxy:18882"
+      PEER_3_URL: "http://toxiproxy:18883"
+      PEER_4_URL: "http://toxiproxy:18884"
+      PEER_5_URL: "http://toxiproxy:18885"
+      ELECTION_TIMEOUT_MS: "6000"
+      HEARTBEAT_INTERVAL_MS: "5000"
+      HEARTBEAT_TIMEOUT_MS: "10000"
+    volumes:
+      - logs-node-5:/app/logs
+    depends_on:
+      - toxiproxy-init
+    restart: unless-stopped
+
+  dashboard:
+    image: nginx:alpine
+    container_name: bully-dashboard
+    networks:
+      - bully-network
+    ports:
+      - "3000:80"
+    volumes:
+      - ./dashboard:/usr/share/nginx/html:rw
+      - ./dashboard/nginx.conf:/etc/nginx/conf.d/default.conf:rw
+    depends_on:
+      - node-1
+      - node-2
+      - node-3
+      - node-4
+      - node-5
+    restart: unless-stopped
